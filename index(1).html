@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SERPENTTE — MAPA DO SISTEMA v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --green: #00ff41;
+  --green-dim: #003300;
+  --green-mid: #00aa2a;
+  --red: #ff0000;
+  --red-dim: #330000;
+  --black: #000000;
+  --amber: #ffb000;
+  --pink: #ff2d8a;
+  --purple: #8800ff;
+}
+
+body {
+  background: #000;
+  color: var(--green);
+  font-family: 'Share Tech Mono', monospace;
+  overflow: hidden;
+  height: 100vh;
+  cursor: crosshair;
+}
+
+body::after {
+  content:'';
+  position:fixed;
+  top:0;left:0;width:100%;height:100%;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,65,0.012) 2px,rgba(0,255,65,0.012) 4px);
+  pointer-events:none;
+  z-index:9000;
+}
+
+/* ===== TERMINAL HEADER ===== */
+#terminal-header {
+  position:fixed; top:0; left:0; right:0;
+  padding:0.4rem 1rem;
+  background:#000;
+  border-bottom:1px solid var(--green-dim);
+  font-family:'VT323',monospace;
+  font-size:1rem;
+  color:var(--green);
+  display:flex;
+  justify-content:space-between;
+  z-index:500;
+  letter-spacing:0.1em;
+}
+.blink { animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ===== MAP ===== */
+#map-container {
+  position:fixed;
+  top:2rem; left:0; right:0; bottom:2rem;
+  overflow:hidden;
+  cursor:grab;
+}
+#map-container:active { cursor:grabbing; }
+
+#map {
+  position:absolute;
+  width:3000px; height:2000px;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+}
+
+#map::before {
+  content:'';
+  position:absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px),
+    linear-gradient(90deg,rgba(0,255,65,0.03) 1px,transparent 1px);
+  background-size:80px 80px;
+}
+
+/* ===== PHASE ZONES ===== */
+.phase-zone {
+  position:absolute;
+  border-radius:12px;
+  border:1px solid;
+  padding:0.5rem 1rem;
+  font-family:'VT323',monospace;
+  font-size:0.9rem;
+  letter-spacing:0.15em;
+  pointer-events:none;
+}
+.phase-zone .zone-title { font-size:1.1rem; margin-bottom:0.2rem; display:block; }
+.phase-zone .zone-sub { font-size:0.7rem; font-family:'Share Tech Mono',monospace; opacity:0.5; }
+
+.zone-origem    { border-color:rgba(255,176,0,0.2); color:#ffb000; background:rgba(255,176,0,0.02); top:1200px; left:100px; width:580px; height:480px; }
+.zone-noite     { border-color:rgba(136,0,255,0.2); color:#8800ff; background:rgba(136,0,255,0.02); top:400px; left:150px; width:580px; height:480px; }
+.zone-caos      { border-color:rgba(255,0,0,0.2);   color:#ff0000; background:rgba(255,0,0,0.02);   top:200px; left:900px; width:580px; height:500px; }
+.zone-reconstrucao { border-color:rgba(0,255,65,0.15); color:#00ff41; background:rgba(0,255,65,0.01); top:800px; left:1100px; width:600px; height:480px; }
+.zone-sintese   { border-color:rgba(255,45,138,0.2); color:#ff2d8a; background:rgba(255,45,138,0.02); top:500px; left:1850px; width:600px; height:500px; }
+
+svg#connections { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+
+/* ===== NODES ===== */
+.node {
+  position:absolute;
+  transform:translate(-50%,-50%);
+  cursor:crosshair;
+  z-index:10;
+}
+.node-inner { display:flex; flex-direction:column; align-items:center; gap:0.3rem; }
+.node-ring {
+  width:64px; height:64px;
+  border-radius:50%;
+  border:2px solid;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+  transition:transform 0.2s, box-shadow 0.3s;
+}
+.node:hover .node-ring { transform:scale(1.2); }
+.node-ring::before {
+  content:''; position:absolute; inset:-8px;
+  border-radius:50%; border:1px solid;
+  animation:ripple 2.5s ease-out infinite; opacity:0;
+}
+.node-ring::after {
+  content:''; position:absolute; inset:-18px;
+  border-radius:50%; border:1px solid;
+  animation:ripple 2.5s ease-out infinite 0.8s; opacity:0;
+}
+@keyframes ripple {
+  0%{transform:scale(0.8);opacity:0.5}
+  100%{transform:scale(1.4);opacity:0}
+}
+.node-icon { font-family:'VT323',monospace; font-size:1.5rem; line-height:1; }
+.node-label { font-family:'VT323',monospace; font-size:0.88rem; letter-spacing:0.1em; text-align:center; white-space:nowrap; }
+.node-sub { font-size:0.5rem; letter-spacing:0.15em; opacity:0.4; font-family:'Share Tech Mono',monospace; }
+
+.node.open .node-ring { border-color:var(--green); background:rgba(0,255,65,0.05); box-shadow:0 0 20px rgba(0,255,65,0.3); color:var(--green); }
+.node.open .node-ring::before,.node.open .node-ring::after { border-color:var(--green); }
+.node.open .node-label { color:var(--green); }
+
+.node.locked .node-ring { border-color:#440000; background:rgba(68,0,0,0.3); animation:lockedPulse 3s infinite; color:#550000; }
+.node.locked .node-ring::before,.node.locked .node-ring::after { border-color:#440000; }
+.node.locked .node-label { color:#440000; }
+@keyframes lockedPulse { 0%,100%{box-shadow:0 0 8px rgba(255,0,0,0.1)} 50%{box-shadow:0 0 20px rgba(255,0,0,0.3)} }
+
+.node.core .node-ring { border-color:var(--amber); background:rgba(255,176,0,0.08); box-shadow:0 0 30px rgba(255,176,0,0.4); color:var(--amber); width:84px; height:84px; }
+.node.core .node-ring::before,.node.core .node-ring::after { border-color:var(--amber); }
+.node.core .node-label { color:var(--amber); font-size:1rem; }
+.node.core .node-icon { font-size:2rem; }
+
+.node.phase .node-ring { border-color:var(--pink); background:rgba(255,45,138,0.06); box-shadow:0 0 15px rgba(255,45,138,0.2); color:var(--pink); }
+.node.phase .node-ring::before,.node.phase .node-ring::after { border-color:var(--pink); }
+.node.phase .node-label { color:var(--pink); }
+
+/* ===== TERMINAL FOOTER ===== */
+#terminal-footer {
+  position:fixed; bottom:0; left:0; right:0;
+  padding:0.3rem 1rem;
+  background:#000;
+  border-top:1px solid var(--green-dim);
+  font-family:'VT323',monospace; font-size:0.9rem;
+  color:var(--green-mid);
+  display:flex; gap:2rem; z-index:500;
+}
+
+/* ===== SPIKE THE CAT ===== */
+#spike {
+  position:fixed;
+  width:80px; height:80px;
+  z-index:700;
+  pointer-events:none;
+  transition:left 4s cubic-bezier(0.4,0,0.2,1), top 4s cubic-bezier(0.4,0,0.2,1);
+  filter:drop-shadow(0 0 8px rgba(255,0,0,0.6));
+}
+#spike-body {
+  font-size:4rem; line-height:1;
+  animation:spikeWalk 0.6s steps(2) infinite;
+  display:block; transform-origin:center; user-select:none;
+}
+@keyframes spikeWalk {
+  0%   { transform:scaleX(1) translateY(0); }
+  25%  { transform:scaleX(1) translateY(-4px); }
+  50%  { transform:scaleX(-1) translateY(0); }
+  75%  { transform:scaleX(-1) translateY(-4px); }
+}
+#spike-eyes {
+  font-size:0.5rem; color:var(--red); text-align:center;
+  font-family:'VT323',monospace; letter-spacing:0.1em;
+  margin-top:-1rem; animation:eyeGlow 2s infinite;
+}
+@keyframes eyeGlow { 0%,100%{opacity:1;text-shadow:0 0 6px red} 50%{opacity:0.4;text-shadow:none} }
+#spike-name { font-family:'VT323',monospace; font-size:0.65rem; color:var(--red); text-align:center; letter-spacing:0.2em; opacity:0.6; }
+
+/* ===== OFFICE ASSISTANT ===== */
+#assistant {
+  position:fixed; bottom:3rem; right:2rem;
+  z-index:800; display:none; flex-direction:column;
+  align-items:flex-end; gap:0.5rem;
+  animation:assistantPop 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+#assistant.visible { display:flex; }
+@keyframes assistantPop {
+  0%{transform:scale(0) translateY(50px);opacity:0}
+  100%{transform:scale(1) translateY(0);opacity:1}
+}
+#assistant-bubble {
+  background:#000; border:1px solid var(--red);
+  padding:0.8rem 1.2rem; font-family:'VT323',monospace;
+  font-size:1.1rem; color:var(--red); letter-spacing:0.1em;
+  max-width:220px; position:relative; box-shadow:0 0 20px rgba(255,0,0,0.3);
+}
+#assistant-bubble::after {
+  content:''; position:absolute; bottom:-8px; right:20px;
+  width:0; height:0;
+  border-left:8px solid transparent; border-right:8px solid transparent;
+  border-top:8px solid var(--red);
+}
+#assistant-body {
+  font-size:5rem; line-height:1; cursor:pointer;
+  filter:drop-shadow(0 0 12px rgba(255,0,0,0.8));
+  animation:assistantBob 2s ease-in-out infinite; user-select:none;
+}
+@keyframes assistantBob {
+  0%,100%{transform:translateY(0) rotate(-3deg)}
+  50%{transform:translateY(-8px) rotate(3deg)}
+}
+#assistant-close {
+  position:absolute; top:-0.3rem; right:-0.3rem;
+  background:var(--red); color:#000; border:none;
+  font-family:'VT323',monospace; font-size:0.8rem;
+  width:18px; height:18px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* ===== INVASION OVERLAY ===== */
+#invasion {
+  position:fixed; inset:0; background:rgba(0,0,0,0);
+  z-index:8000; display:none; align-items:center;
+  justify-content:center; flex-direction:column;
+}
+#invasion.active { display:flex; animation:invasionBG 0.1s forwards; }
+@keyframes invasionBG { to{background:rgba(0,0,0,0.93)} }
+#invasion-screen {
+  width:min(700px,95vw); border:2px solid var(--red);
+  background:#000; box-shadow:0 0 60px rgba(255,0,0,0.5);
+  font-family:'VT323',monospace; animation:screenGlitch 0.3s ease;
+}
+@keyframes screenGlitch {
+  0%{transform:translateX(-20px) skewX(-5deg);opacity:0}
+  30%{transform:translateX(8px) skewX(2deg)}
+  100%{transform:translateX(0) skewX(0);opacity:1}
+}
+#invasion-header {
+  background:var(--red); color:#000;
+  padding:0.4rem 1rem; font-size:1.1rem;
+  letter-spacing:0.2em; display:flex; justify-content:space-between;
+}
+#invasion-body {
+  padding:1.5rem; font-size:1rem;
+  color:var(--green); line-height:1.8; min-height:280px;
+}
+.alert-line { color:var(--red); font-size:1.4rem; letter-spacing:0.3em; animation:flashRed 0.5s infinite; }
+@keyframes flashRed { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.corrupt-line { color:#005500; font-size:0.8rem; }
+.locked-msg { margin-top:1.5rem; border:1px solid #330000; padding:1rem; color:#770000; line-height:1.6; font-size:0.88rem; }
+.locked-msg span { color:var(--red); }
+#invasion-footer {
+  border-top:1px solid #330000; padding:0.8rem 1.5rem;
+  display:flex; justify-content:space-between; align-items:center;
+}
+#invasion-close {
+  background:none; border:1px solid var(--red);
+  color:var(--red); font-family:'VT323',monospace;
+  font-size:1rem; letter-spacing:0.3em;
+  padding:0.4rem 1.5rem; cursor:pointer;
+  transition:background 0.2s,color 0.2s;
+}
+#invasion-close:hover { background:var(--red); color:#000; }
+
+/* ===== UNIVERSE FALL ===== */
+#universe-fall {
+  position:fixed; inset:0; z-index:9500;
+  display:none; overflow:hidden; background:#000;
+}
+#universe-fall.active { display:block; }
+#fall-scene {
+  width:100%; height:100%; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; position:relative;
+  animation:fallIn 1s ease forwards;
+}
+@keyframes fallIn {
+  0%{opacity:0;transform:scale(3) rotate(5deg)}
+  100%{opacity:1;transform:scale(1) rotate(0)}
+}
+.fall-water {
+  position:absolute; bottom:0; left:0; right:0; height:45%;
+  background:linear-gradient(180deg, #001122 0%, #003355 40%, #001133 100%);
+  overflow:hidden;
+}
+.fall-water::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:4px;
+  background:linear-gradient(90deg, transparent, rgba(0,200,255,0.3), transparent);
+  animation:waterShimmer 3s linear infinite;
+}
+@keyframes waterShimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+.fall-bg {
+  position:absolute; top:0; left:0; right:0; height:60%;
+  background:linear-gradient(180deg, #0a1a00 0%, #1a3300 50%, #001122 100%);
+}
+.fall-trees {
+  position:absolute; top:5%; left:0; right:0; height:50%;
+  font-size:6rem; letter-spacing:-0.5rem;
+  display:flex; align-items:flex-end; justify-content:center;
+  opacity:0.4; filter:blur(1px);
+}
+.fall-car {
+  position:absolute; bottom:40%; left:50%; transform:translateX(-50%);
+  font-size:6rem;
+  filter:drop-shadow(0 0 30px rgba(255,0,200,0.9)) drop-shadow(0 0 60px rgba(255,0,200,0.5));
+  animation:carBob 2s ease-in-out infinite; z-index:2;
+}
+@keyframes carBob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-10px)} }
+.fall-croc {
+  position:absolute; font-size:3rem;
+  filter:drop-shadow(0 0 10px rgba(255,200,0,0.6));
+  animation:crocSwim 4s ease-in-out infinite;
+}
+@keyframes crocSwim { 0%,100%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(10px) rotate(5deg)} }
+.fall-text {
+  position:absolute; bottom:15%; left:0; right:0; text-align:center;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(1.5rem, 4vw, 2.5rem);
+  color:var(--pink); letter-spacing:0.3em;
+  text-shadow:0 0 30px rgba(255,45,138,0.8); z-index:3;
+}
+.fall-phase-name {
+  font-family:'VT323',monospace; font-size:1rem;
+  color:rgba(255,255,255,0.4); letter-spacing:0.4em; margin-top:0.5rem;
+}
+.fall-close {
+  position:absolute; top:1rem; right:1rem;
+  background:none; border:1px solid var(--pink);
+  color:var(--pink); font-family:'VT323',monospace;
+  font-size:0.9rem; letter-spacing:0.2em;
+  padding:0.4rem 1rem; cursor:pointer; z-index:4;
+}
+
+/* ===== OPEN NODE MODAL ===== */
+#node-modal {
+  position:fixed; inset:0; background:rgba(0,0,0,0.88);
+  z-index:8000; display:none; align-items:center; justify-content:center;
+}
+#node-modal.active { display:flex; }
+#node-modal-inner {
+  width:min(600px,95vw); border:1px solid var(--green);
+  background:#000; box-shadow:0 0 40px rgba(0,255,65,0.3);
+  font-family:'VT323',monospace; animation:screenGlitch 0.2s ease;
+}
+#node-modal-header {
+  background:var(--green); color:#000;
+  padding:0.4rem 1rem; font-size:1.1rem;
+  letter-spacing:0.2em; display:flex; justify-content:space-between;
+}
+#node-modal-body {
+  padding:2rem; color:var(--green);
+  line-height:1.8; font-size:1rem; min-height:200px;
+}
+#node-modal-close {
+  background:none; border:1px solid var(--green);
+  color:var(--green); font-family:'VT323',monospace;
+  font-size:1rem; letter-spacing:0.3em;
+  padding:0.4rem 1.5rem; cursor:pointer;
+  margin:1rem 2rem 1.5rem;
+  transition:background 0.2s,color 0.2s;
+}
+#node-modal-close:hover { background:var(--green); color:#000; }
+
+/* ===== CADASTRO MODAL ===== */
+#register-modal {
+  position:fixed; inset:0; background:rgba(0,0,0,0.92);
+  z-index:9800; display:none; align-items:center; justify-content:center;
+}
+#register-modal.active { display:flex; }
+#register-inner {
+  width:min(480px,95vw); border:1px solid var(--green);
+  background:#000; box-shadow:0 0 50px rgba(0,255,65,0.4);
+  font-family:'VT323',monospace;
+  animation:screenGlitch 0.3s ease;
+}
+#register-header {
+  background:var(--green); color:#000;
+  padding:0.5rem 1.2rem; font-size:1.1rem;
+  letter-spacing:0.25em; display:flex; justify-content:space-between;
+  align-items:center;
+}
+#register-body { padding:1.5rem 2rem; }
+#register-body p {
+  color:#00aa2a; font-size:0.9rem; margin-bottom:1.2rem;
+  line-height:1.6; letter-spacing:0.08em;
+}
+.reg-field { margin-bottom:1rem; }
+.reg-field label {
+  display:block; color:var(--green-mid);
+  font-size:0.75rem; letter-spacing:0.25em; margin-bottom:0.3rem;
+}
+.reg-field input {
+  width:100%; background:#000; border:1px solid #004400;
+  color:var(--green); font-family:'Share Tech Mono',monospace;
+  font-size:0.9rem; padding:0.5rem 0.8rem;
+  outline:none; letter-spacing:0.05em;
+  transition:border-color 0.2s;
+}
+.reg-field input:focus { border-color:var(--green); box-shadow:0 0 10px rgba(0,255,65,0.2); }
+.reg-field input::placeholder { color:#003300; }
+#register-submit {
+  width:100%; background:transparent; border:1px solid var(--green);
+  color:var(--green); font-family:'VT323',monospace;
+  font-size:1.1rem; letter-spacing:0.3em;
+  padding:0.6rem; cursor:pointer; margin-top:0.5rem;
+  transition:background 0.2s, color 0.2s;
+}
+#register-submit:hover { background:var(--green); color:#000; }
+#register-skip {
+  display:block; text-align:center; margin-top:0.8rem;
+  color:#222; font-size:0.7rem; letter-spacing:0.2em;
+  cursor:pointer; font-family:'Share Tech Mono',monospace;
+  transition:color 0.2s;
+}
+#register-skip:hover { color:#555; }
+#register-success {
+  display:none; padding:2rem; text-align:center;
+  color:var(--green); font-size:1rem; line-height:2;
+}
+
+/* DRAG HINT */
+#drag-hint {
+  position:fixed; bottom:3rem; left:50%;
+  transform:translateX(-50%);
+  font-family:'VT323',monospace; font-size:0.85rem;
+  color:#004400; letter-spacing:0.2em;
+  animation:fadeHint 5s ease 2s forwards;
+  z-index:600; pointer-events:none;
+}
+@keyframes fadeHint { 0%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
+</style>
+</head>
+<body>
+
+<div id="terminal-header">
+  <span>SERPENTTE_OS v6.0 // SISTEMA ATIVO // SÃO PAULO</span>
+  <span id="clock">00:00:00</span>
+  <span>SLOT_6 / <span class="blink">●</span> ONLINE</span>
+</div>
+
+<div id="map-container">
+  <div id="map">
+    <div class="phase-zone zone-origem">
+      <span class="zone-title">FASE I — ORIGEM</span>
+      <span class="zone-sub">GABRIEL · HELIÓPOLIS · 2013</span>
+    </div>
+    <div class="phase-zone zone-noite">
+      <span class="zone-title">FASE II — A NOITE</span>
+      <span class="zone-sub">SERPENTTE0669 · ACESSO · EXCESSO</span>
+    </div>
+    <div class="phase-zone zone-caos">
+      <span class="zone-title">FASE III — O CAOS</span>
+      <span class="zone-sub">SERPENTTE0966 · COLAPSO · BATALHA</span>
+    </div>
+    <div class="phase-zone zone-reconstrucao">
+      <span class="zone-title">FASE IV — RECONSTRUÇÃO</span>
+      <span class="zone-sub">SERPENTTE0000 · PROTEÇÃO · RETORNO</span>
+    </div>
+    <div class="phase-zone zone-sintese">
+      <span class="zone-title">FASE V — SÍNTESE</span>
+      <span class="zone-sub">6LENDA · SÃO PAULO · 2026</span>
+    </div>
+    <svg id="connections"></svg>
+  </div>
+</div>
+
+<div id="terminal-footer">
+  <span>BUFFER_0/SLOT_6/DRIVE_1</span>
+  <span id="status-msg">AGUARDANDO COMANDO_</span>
+  <span>NODES: <span id="node-count">0</span>/14 DESBLOQUEADOS</span>
+</div>
+
+<div id="drag-hint">// ARRASTE PARA EXPLORAR — CLIQUE NOS NODES //</div>
+
+<!-- SPIKE -->
+<div id="spike">
+  <span id="spike-body">🐱</span>
+  <div id="spike-eyes">◉ ◉</div>
+  <div id="spike-name">SPIKE</div>
+</div>
+
+<!-- OFFICE ASSISTANT -->
+<div id="assistant">
+  <div id="assistant-bubble">
+    <button id="assistant-close" onclick="dismissAssistant()">×</button>
+    <span id="assistant-text">posso te ajudar? 👁</span>
+  </div>
+  <div id="assistant-body" onclick="assistantClick()">🗣️</div>
+</div>
+
+<!-- INVASION -->
+<div id="invasion">
+  <div id="invasion-screen">
+    <div id="invasion-header">
+      <span>!! ALERTA DO SISTEMA !!</span>
+      <span id="invasion-time">00:00</span>
+    </div>
+    <div id="invasion-body">
+      <div class="alert-line" id="inv-alert">⚠ SERPENTTE INVADIU ⚠</div>
+      <div id="inv-line1"></div>
+      <div id="inv-line2"></div>
+      <div id="inv-line3"></div>
+      <div class="corrupt-line" id="inv-corrupt"></div>
+      <div class="locked-msg" id="inv-locked"></div>
+    </div>
+    <div id="invasion-footer">
+      <span style="font-size:0.8rem;color:#440000;letter-spacing:0.15em;">COMMAND: _</span>
+      <button id="invasion-close" onclick="closeInvasion()">[ ESC — RECUAR ]</button>
+    </div>
+  </div>
+</div>
+
+<!-- UNIVERSE FALL -->
+<div id="universe-fall">
+  <div id="fall-scene">
+    <button class="fall-close" onclick="closeFall()">[ ESC — VOLTAR ]</button>
+    <div class="fall-bg"></div>
+    <div class="fall-trees">🌿🌿🌿🌿🌿🌿🌿🌿🌿🌿🌿🌿</div>
+    <div class="fall-water">
+      <div class="fall-croc" style="left:5%;top:30%">🐊</div>
+      <div class="fall-croc" style="left:75%;top:20%;animation-delay:1s">🐊</div>
+      <div class="fall-croc" style="left:25%;top:50%;animation-delay:2s">🐊</div>
+      <div class="fall-croc" style="left:60%;top:55%;animation-delay:0.5s">🐊</div>
+    </div>
+    <div class="fall-car">🚗</div>
+    <div style="position:absolute;bottom:15%;left:0;right:0;text-align:center;z-index:3">
+      <div class="fall-text" id="fall-title">FASE II — A NOITE</div>
+      <div class="fall-phase-name" id="fall-sub">SERPENTTE0669 · O ACESSO TEM UM PREÇO</div>
+      <div style="margin-top:1.5rem;font-family:'Share Tech Mono',monospace;font-size:0.7rem;color:rgba(255,255,255,0.3);letter-spacing:0.2em" id="fall-text-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- NODE MODAL -->
+<div id="node-modal">
+  <div id="node-modal-inner">
+    <div id="node-modal-header">
+      <span id="modal-title">NODE</span>
+      <span>ACESSO LIBERADO</span>
+    </div>
+    <div id="node-modal-body"></div>
+    <button id="node-modal-close" onclick="closeModal()">[ FECHAR ]</button>
+  </div>
+</div>
+
+<!-- CADASTRO MODAL -->
+<div id="register-modal">
+  <div id="register-inner">
+    <div id="register-header">
+      <span>// ACESSO AO SISTEMA //</span>
+      <span style="cursor:pointer;font-size:0.9rem" onclick="skipRegister()">×</span>
+    </div>
+    <div id="register-body">
+      <p>SERPENTTE_OS detectou um novo terminal.<br>Registre sua presença para continuar.</p>
+      <div class="reg-field">
+        <label>IDENTIFICAÇÃO —</label>
+        <input type="text" id="reg-name" placeholder="SEU NOME" autocomplete="off">
+      </div>
+      <div class="reg-field">
+        <label>CANAL DE COMUNICAÇÃO —</label>
+        <input type="email" id="reg-email" placeholder="SEU EMAIL" autocomplete="off">
+      </div>
+      <button id="register-submit" onclick="submitRegister()">[ REGISTRAR NO SISTEMA ]</button>
+      <span id="register-skip" onclick="skipRegister()">pular — entrar como anônimo</span>
+    </div>
+    <div id="register-success">
+      <div style="color:var(--green);font-size:2rem">✓</div>
+      <div>ACESSO CONCEDIDO</div>
+      <div style="color:#004400;font-size:0.7rem;margin-top:0.5rem">BEM-VINDO AO SISTEMA, <span id="reg-welcome-name"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =========================================================
+// ANALYTICS ENGINE — coleta e envia dados para /api/track
+// =========================================================
+const SESSION_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
+const ENTRY_TIME = Date.now();
+let visitorData = {};
+let nodeClickLog = [];
+
+// Detecta geolocalização via IP (sem pedir permissão)
+async function detectGeo() {
+  try {
+    const r = await fetch('https://ipapi.co/json/');
+    const d = await r.json();
+    visitorData.geo = {
+      city: d.city,
+      region: d.region,
+      country: d.country_name,
+      ip: d.ip,
+      timezone: d.timezone,
+      org: d.org,
+    };
+  } catch(e) {
+    visitorData.geo = { error: 'geo_failed' };
+  }
+}
+
+// Coleta dados do dispositivo
+function collectDeviceData() {
+  visitorData.device = {
+    userAgent: navigator.userAgent,
+    language: navigator.language,
+    platform: navigator.platform,
+    screenWidth: screen.width,
+    screenHeight: screen.height,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    referrer: document.referrer || 'direct',
+    colorDepth: screen.colorDepth,
+    touchSupport: 'ontouchstart' in window,
+  };
+}
+
+// Envia evento para a API
+async function track(type, payload = {}) {
+  const body = {
+    type,
+    sessionId: SESSION_ID,
+    ...visitorData,
+    ...payload,
+    timeOnSite: Math.round((Date.now() - ENTRY_TIME) / 1000),
+  };
+  try {
+    await fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch(e) {
+    // silently fail — não bloqueia a experiência
+    console.log('[track failed]', e);
+  }
+}
+
+// Rastreia saída da página
+function trackExit() {
+  const payload = {
+    timeOnSite: Math.round((Date.now() - ENTRY_TIME) / 1000),
+    nodesClicked: nodeClickLog,
+  };
+  // sendBeacon é mais confiável no unload
+  const body = JSON.stringify({ type: 'exit', sessionId: SESSION_ID, ...visitorData, ...payload });
+  navigator.sendBeacon && navigator.sendBeacon('/api/track', new Blob([body], {type:'application/json'}));
+}
+
+// Init — roda ao carregar
+(async () => {
+  collectDeviceData();
+  await detectGeo();
+  await track('pageview');
+
+  // Rastrea saída
+  window.addEventListener('beforeunload', trackExit);
+  window.addEventListener('pagehide', trackExit);
+
+  // Rastrea tempo a cada 30s (heartbeat)
+  setInterval(() => track('heartbeat', { nodesClicked: nodeClickLog }), 30000);
+})();
+
+// =========================================================
+// CADASTRO
+// =========================================================
+function showRegisterModal() {
+  // Só mostra se ainda não cadastrou nesta sessão
+  if (localStorage.getItem('serpentte_registered')) return;
+  setTimeout(() => {
+    document.getElementById('register-modal').classList.add('active');
+  }, 4000); // aparece após 4s
+}
+
+async function submitRegister() {
+  const name  = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  if (!name || !email) {
+    document.getElementById('reg-name').style.borderColor = '#ff0000';
+    document.getElementById('reg-email').style.borderColor = '#ff0000';
+    return;
+  }
+  const registrationData = { name, email };
+  visitorData.registration = registrationData;
+  localStorage.setItem('serpentte_registered', '1');
+
+  await track('registration', { registration: registrationData });
+
+  document.getElementById('register-body').style.display = 'none';
+  document.getElementById('register-success').style.display = 'block';
+  document.getElementById('reg-welcome-name').textContent = name.toUpperCase();
+  setStatus('NOVO USUÁRIO REGISTRADO — BEM-VINDO, ' + name.toUpperCase());
+
+  setTimeout(() => {
+    document.getElementById('register-modal').classList.remove('active');
+  }, 2500);
+}
+
+function skipRegister() {
+  localStorage.setItem('serpentte_registered', '1');
+  document.getElementById('register-modal').classList.remove('active');
+  track('registration_skipped');
+}
+
+// =========================================================
+// AUDIO ENGINE
+// =========================================================
+let audioCtx = null;
+let beatInterval = null;
+let beatPlaying = false;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playHorn() {
+  const t = audioCtx.currentTime;
+  [220, 277.18, 329.63].forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const dist = audioCtx.createWaveShaper();
+    const curve = new Float32Array(256);
+    for(let j=0;j<256;j++) curve[j] = Math.tanh(((j/128)-1)*4);
+    dist.curve = curve;
+    osc.type = 'sawtooth'; osc.frequency.value = freq;
+    osc.connect(dist); dist.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0, t + i * 0.05);
+    gain.gain.linearRampToValueAtTime(0.3, t + i * 0.05 + 0.02);
+    gain.gain.setValueAtTime(0.3, t + 0.4);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+    osc.start(t + i * 0.05); osc.stop(t + 0.8);
+  });
+  const hornOsc = audioCtx.createOscillator();
+  const hornGain = audioCtx.createGain();
+  hornOsc.type = 'square';
+  hornOsc.frequency.setValueAtTime(440, t + 0.1);
+  hornOsc.frequency.linearRampToValueAtTime(880, t + 0.3);
+  hornOsc.frequency.setValueAtTime(660, t + 0.4);
+  hornGain.gain.setValueAtTime(0.15, t + 0.1);
+  hornGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+  hornOsc.connect(hornGain); hornGain.connect(audioCtx.destination);
+  hornOsc.start(t + 0.1); hornOsc.stop(t + 0.7);
+}
+
+function playVoiceAlert(text) {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'pt-BR'; utt.rate = 0.8; utt.pitch = 0.5; utt.volume = 0.9;
+    window.speechSynthesis.speak(utt);
+  }
+}
+
+function playKick() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.12);
+  gain.gain.setValueAtTime(1.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+}
+
+function playSnare() {
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate*0.15, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<buf.length;i++) data[i]=(Math.random()*2-1)*(1-i/buf.length);
+  const src = audioCtx.createBufferSource();
+  const gain = audioCtx.createGain();
+  const filt = audioCtx.createBiquadFilter();
+  filt.type='bandpass'; filt.frequency.value=2500; filt.Q.value=0.7;
+  src.buffer=buf; src.connect(filt); filt.connect(gain); gain.connect(audioCtx.destination);
+  gain.gain.setValueAtTime(0.9, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.15);
+  src.start();
+}
+
+function playBass(freq, dur) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const filt = audioCtx.createBiquadFilter();
+  filt.type='lowpass'; filt.frequency.value=280;
+  osc.type='sawtooth'; osc.frequency.value=freq;
+  osc.connect(filt); filt.connect(gain); gain.connect(audioCtx.destination);
+  gain.gain.setValueAtTime(0.65, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+dur);
+  osc.start(); osc.stop(audioCtx.currentTime+dur);
+}
+
+function playHihat(open=false) {
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate*(open?0.1:0.04), audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<buf.length;i++) data[i]=(Math.random()*2-1)*(1-i/buf.length);
+  const src = audioCtx.createBufferSource();
+  const gain = audioCtx.createGain();
+  const filt = audioCtx.createBiquadFilter();
+  filt.type='highpass'; filt.frequency.value=7000;
+  src.buffer=buf; src.connect(filt); filt.connect(gain); gain.connect(audioCtx.destination);
+  gain.gain.value=open?0.3:0.18; src.start();
+}
+
+const PATTERN=['K','H','H','K','S','H','K','H','K','H','H','O','S','H','K','H'];
+const BASS=[{f:55,d:0.15},{f:55,d:0.1},{f:73.4,d:0.15},{f:55,d:0.1},{f:65.4,d:0.2},{f:55,d:0.1},{f:73.4,d:0.15},{f:61.7,d:0.1}];
+let step16=0, bassStep=0;
+
+function startBeat() {
+  if(beatPlaying) return;
+  beatPlaying=true;
+  const stepMs=(60/140/4)*1000;
+  beatInterval=setInterval(()=>{
+    const hit=PATTERN[step16%16];
+    if(hit==='K') playKick();
+    if(hit==='S') playSnare();
+    if(hit==='H') playHihat(false);
+    if(hit==='O') playHihat(true);
+    if(step16%2===0){ const b=BASS[bassStep%BASS.length]; playBass(b.f,b.d); bassStep++; }
+    step16++;
+  }, stepMs);
+}
+
+function stopBeat() {
+  if(beatInterval){ clearInterval(beatInterval); beatInterval=null; }
+  beatPlaying=false; step16=0;
+}
+
+// =========================================================
+// NODES
+// =========================================================
+const NODES = [
+  { id:'core', x:1500, y:1000, type:'core', label:'6LENDA', sub:'NÚCLEO ATIVO', icon:'⬡',
+    content:`<div style="color:var(--amber);font-size:1.3rem;margin-bottom:1rem">⬡ 6LENDA — SÍNTESE FINAL</div>
+    Glenda Teixeira. A criadora de todas as personas.<br>
+    Heliópolis → São Paulo → O Mundo.<br><br>
+    O 6 como ponto médio de todas as serpentes.<br>
+    Uma lenda porque viveu tudo — e ainda está aqui.<br><br>
+    <div style="color:var(--amber)">→ SISTEMA: ATIVO 2026<br>→ PERSONAS INTEGRADAS: 6<br>→ MISSÃO: EM EXECUÇÃO</div>`},
+  { id:'gabriel', x:300, y:1380, type:'open', label:'GABRIEL', sub:'A ORIGEM · 0v0',icon:'◈',
+    content:`<div style="margin-bottom:1rem;color:var(--amber)">◈ GABRIEL — A ORIGEM</div>
+    Nascido em Heliópolis. Nome de anjo.<br>
+    Desejo de pertencer. Vulnerabilidade pura.<br><br>
+    2013 — o silêncio antes da transformação.<br>
+    A pureza que precede o caos.<br><br>
+    <div style="color:#444;font-size:0.85rem">→ FASE I DO SISTEMA<br>→ PRÉ-CONTAMINAÇÃO</div>`},
+  { id:'helio', x:480, y:1560, type:'open', label:'HELIÓPOLIS', sub:'ORIGEM GEOGRÁFICA', icon:'◉',
+    content:`<div style="margin-bottom:1rem;color:var(--amber)">◉ HELIÓPOLIS — SÃO PAULO</div>
+    A maior favela de São Paulo.<br>
+    O corpo que nasce aqui carrega um mapa.<br><br>
+    SERPENTTE começa aqui.<br>
+    A periferia não é ponto de partida —<br>
+    é o fundamento de tudo.<br><br>
+    <div style="color:#444;font-size:0.85rem">→ COORDENADAS: SÃO PAULO, SP<br>→ STATUS: FUNDAÇÃO DO SISTEMA</div>`},
+  { id:'origem_locked', x:200, y:1580, type:'locked', label:'ARQUIVO_2013', sub:'MEMÓRIA BLOQUEADA', icon:'⊘'},
+  { id:'noite_fall', x:380, y:680, type:'phase', label:'A NOITE', sub:'CLIQUE PARA CAIR', icon:'◬',
+    isFall:true, fallTitle:'FASE II — A NOITE',
+    fallSub:'SERPENTTE0669 · O ACESSO TEM UM PREÇO',
+    fallBody:'Os espaços desejados foram alcançados.\nBeleza como moeda. Troca como linguagem.\nOs números surgiram sozinhos: 0669.' },
+  { id:'s0669', x:560, y:530, type:'open', label:'SERPENTTE0669', sub:'ACESSO · EXCESSO', icon:'◎',
+    content:`<div style="margin-bottom:1rem;color:#8800ff">◎ SERPENTTE0669</div>
+    O acesso foi conquistado — mas com preço.<br>
+    Beleza como moeda de troca.<br>
+    Os espaços desejados alcançados.<br><br>
+    Os números 0669 surgiram sozinhos.<br>
+    O excesso como linguagem.<br><br>
+    <div style="color:#440066;font-size:0.85rem">→ FASE II DO SISTEMA<br>→ ACESSO: CONQUISTADO<br>→ CUSTO: ALTO</div>`},
+  { id:'noite_locked', x:200, y:520, type:'locked', label:'ARQUIVO_0669', sub:'ACESSO RESTRITO', icon:'⊘'},
+  { id:'s0966', x:1050, y:320, type:'open', label:'SERPENTTE0966', sub:'INVERSÃO · CAOS', icon:'◈',
+    content:`<div style="margin-bottom:1rem;color:var(--red)">◈ SERPENTTE0966</div>
+    A inversão. O mesmo número — outra ordem.<br>
+    Identidade em colapso.<br><br>
+    A batalha mais longa do sistema.<br>
+    Anos de caos. Consequências extremas.<br><br>
+    <div style="color:#550000;font-size:0.85rem">→ FASE III DO SISTEMA<br>→ STATUS: SUPERADO<br>→ DURAÇÃO: ANOS</div>`},
+  { id:'caos_locked1', x:1300, y:250, type:'locked', label:'ARQUIVO_0966', sub:'MEMÓRIA TRANCADA', icon:'⊘'},
+  { id:'caos_locked2', x:1150, y:500, type:'locked', label:'PESQUISA_CORPO', sub:'ACESSO RESTRITO', icon:'⊘'},
+  { id:'s0000', x:1300, y:1000, type:'open', label:'SERPENTTE0000', sub:'PROTEÇÃO · RENASCIMENTO', icon:'◉',
+    content:`<div style="margin-bottom:1rem;color:var(--green)">◉ SERPENTTE0000</div>
+    O reinício. Energia de proteção.<br>
+    Sabia que Gabriel estava desaparecendo.<br>
+    Decidiu que não desapareceria por completo.<br><br>
+    Consciência interna. Prosperidade como mandato.<br><br>
+    <div style="color:#004400;font-size:0.85rem">→ FASE IV DO SISTEMA<br>→ FUNÇÃO: PROTEÇÃO<br>→ RESULTADO: 6LENDA</div>`},
+  { id:'recon_locked', x:1150, y:1200, type:'locked', label:'TIMELINE_COMPLETA', sub:'ACESSO PAGO', icon:'⊘'},
+  { id:'store', x:2100, y:680, type:'open', label:'SERPENTTE_STORE', sub:'LOJA ABERTA', icon:'◉',
+    content:`<div style="margin-bottom:1rem;color:var(--pink)">◉ SERPENTTE STORE</div>
+    Obras, imagens, edições limitadas.<br><br>
+    <div style="color:var(--green)">→ @serpentte_store no Instagram<br>→ Contato direto via DM<br>→ PIX aceito<br>→ NFT via Zora (em breve)</div><br>
+    <div style="color:#333;font-size:0.85rem">Colaborações, direção de imagem<br>e projetos artísticos — entre em contato.</div>`},
+  { id:'instagramm', x:2050, y:870, type:'open', label:'@6LENDAAA', sub:'INSTAGRAM — O QUESTIONAMENTO', icon:'◬',
+    content:`<div style="margin-bottom:1rem;color:var(--pink)">◬ @6LENDAAA</div>
+    O Instagram é onde o mistério vive.<br><br>
+    Questionamentos. Não respostas.<br>
+    As imagens que ninguém sabe se são reais.<br>
+    A porta de entrada para o universo.<br><br>
+    <div style="color:var(--pink)">→ instagram.com/6lendaaa</div>`},
+  { id:'sintese_locked', x:2300, y:750, type:'locked', label:'ARQUIVO_COMPLETO', sub:'ACESSO PAGO', icon:'⊘'},
+];
+
+// =========================================================
+// RENDER
+// =========================================================
+const mapEl = document.getElementById('map');
+const svgEl = document.getElementById('connections');
+let unlockedCount = 0;
+
+function renderNodes() {
+  NODES.forEach(node => {
+    const el = document.createElement('div');
+    el.className = `node ${node.type}`;
+    el.style.left = node.x + 'px';
+    el.style.top  = node.y + 'px';
+    el.id = 'node-' + node.id;
+    el.dataset.id = node.id;
+    el.innerHTML = `<div class="node-inner">
+      <div class="node-ring"><span class="node-icon">${node.icon}</span></div>
+      <div class="node-label">${node.label}</div>
+      <div class="node-sub">${node.sub}</div>
+    </div>`;
+    el.addEventListener('click', e => { e.stopPropagation(); handleNodeClick(node); });
+    mapEl.appendChild(el);
+    if (node.type !== 'locked') unlockedCount++;
+  });
+  document.getElementById('node-count').textContent = unlockedCount;
+  renderConnections();
+}
+
+function renderConnections() {
+  const lines = [
+    ['core','gabriel'],['core','s0669'],['core','s0966'],['core','s0000'],['core','store'],
+    ['gabriel','helio'],['gabriel','origem_locked'],
+    ['s0669','noite_fall'],['s0669','noite_locked'],
+    ['s0966','caos_locked1'],['s0966','caos_locked2'],
+    ['s0000','recon_locked'],['s0000','core'],
+    ['store','instagramm'],['store','sintese_locked'],
+    ['noite_fall','s0669'],
+  ];
+  lines.forEach(([a,b]) => {
+    const na = NODES.find(n=>n.id===a), nb = NODES.find(n=>n.id===b);
+    if (!na||!nb) return;
+    const locked = na.type==='locked'||nb.type==='locked';
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',na.x); line.setAttribute('y1',na.y);
+    line.setAttribute('x2',nb.x); line.setAttribute('y2',nb.y);
+    line.setAttribute('stroke',locked?'rgba(80,0,0,0.35)':'rgba(0,255,65,0.12)');
+    line.setAttribute('stroke-width','1');
+    line.setAttribute('stroke-dasharray',locked?'3,9':'2,6');
+    svgEl.appendChild(line);
+  });
+}
+
+// =========================================================
+// NODE CLICK
+// =========================================================
+const invasionMsgs = [
+  { alert:'⚠ SERPENTTE INVADIU ⚠',
+    lines:['ALERT: PERSONA_DEVINTION_DETECTED','SCANNING: USER_BIOMETRIC... ████ 94%','DATA_HARVEST: MUSIC_HASH COLETADO'],
+    corrupt:'$38: FF FF FF FF — KNOWN_ALIAS: ???',
+    locked:`ACESSO NEGADO.\n\n<span>Este fragmento está bloqueado.</span>\nA SERPENTTE detectou sua presença\nmas ainda não decide se você merece ver.\n\nVolte quando souber o código.`},
+  { alert:'!! INVASÃO DETECTADA !!',
+    lines:['BUFFER_0/SLOT_6 — SERPENTTE PROTOCOL','CITIZEN_ID: ████████ — INDEXANDO...','PSYCH_EVAL_STATUS: PROCESSANDO...'],
+    corrupt:'PREFERRED_SKIN: [REDACTED] // MUSIC_HASH: [REDACTED]',
+    locked:`SISTEMA BLOQUEADO.\n\n<span>Você encontrou um setor restrito.</span>\nEste conteúdo pertence às camadas\nmais profundas do universo SERPENTTE.\n\nAcesso disponível em breve.`},
+  { alert:'⚡ ALERTA MÁXIMO — SERPENTTE_OS ⚡',
+    lines:['VIRUS_SIGNATURE: SERPENTTE_v6 — CONFIRMADO','REGION: HELIÓPOLIS // CIDADE: SÃO PAULO','COMMAND: AGUARDANDO INSTRUÇÃO DA 6LENDA...'],
+    corrupt:'ANAC}@.]@>× — SiPE$×i>ZEN — $78: 56 FF',
+    locked:`ACESSO CLASSIFICADO.\n\n<span>A 6LENDA ainda não liberou este setor.</span>\nQuando o tempo chegar, você saberá.\n\n— EQUIPE SERPENTTE`},
+];
+let msgIdx = 0;
+
+function handleNodeClick(node) {
+  initAudio();
+
+  // ── ANALYTICS: registra clique no node ──
+  nodeClickLog.push({ node: node.id, label: node.label, type: node.type, ts: Date.now() });
+  track('node_click', { nodeId: node.id, nodeLabel: node.label, nodeType: node.type });
+
+  if (node.type === 'locked') {
+    triggerInvasion(node);
+  } else if (node.isFall) {
+    triggerFall(node);
+  } else {
+    openNodeModal(node);
+  }
+}
+
+function triggerInvasion(node) {
+  const msg = invasionMsgs[msgIdx % invasionMsgs.length]; msgIdx++;
+  playHorn();
+  setTimeout(() => playVoiceAlert('Alerta! Serpentte invadiu o sistema!'), 300);
+  setTimeout(startBeat, 500);
+  document.getElementById('invasion').classList.add('active');
+  document.getElementById('inv-alert').textContent = msg.alert;
+  ['inv-line1','inv-line2','inv-line3','inv-corrupt'].forEach(id => document.getElementById(id).textContent = '');
+  document.getElementById('inv-locked').innerHTML = '';
+  const t = new Date();
+  document.getElementById('invasion-time').textContent =
+    t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0');
+  setTimeout(() => typeText('inv-line1', msg.lines[0]), 300);
+  setTimeout(() => typeText('inv-line2', msg.lines[1]), 1000);
+  setTimeout(() => typeText('inv-line3', msg.lines[2]), 1700);
+  setTimeout(() => typeText('inv-corrupt', msg.corrupt, true), 2400);
+  setTimeout(() => {
+    document.getElementById('inv-locked').innerHTML = msg.locked.replace(/\n/g,'<br>');
+    setStatus('ACESSO BLOQUEADO — SERPENTTE ATIVA');
+  }, 3100);
+}
+
+function triggerFall(node) {
+  document.getElementById('fall-title').textContent = node.fallTitle || 'SERPENTTE — FASE';
+  document.getElementById('fall-sub').textContent = node.fallSub || '';
+  const bodyEl = document.getElementById('fall-text-body');
+  bodyEl.textContent = '';
+  document.getElementById('universe-fall').classList.add('active');
+  setStatus('ENTRANDO NO UNIVERSO...');
+  if (node.fallBody) setTimeout(() => typeText('fall-text-body', node.fallBody), 1500);
+  playHorn();
+  setTimeout(startBeat, 400);
+}
+
+function closeFall() {
+  document.getElementById('universe-fall').classList.remove('active');
+  stopBeat();
+  setStatus('UNIVERSO FECHADO — RETORNANDO_');
+}
+
+function typeText(elId, text, corrupt=false) {
+  const el = document.getElementById(elId);
+  el.textContent = ''; let i = 0;
+  const timer = setInterval(() => {
+    if (i < text.length) { el.textContent += text[i]; i++; }
+    else clearInterval(timer);
+  }, corrupt ? 25 : 35);
+}
+
+function closeInvasion() {
+  document.getElementById('invasion').classList.remove('active');
+  stopBeat();
+  window.speechSynthesis && window.speechSynthesis.cancel();
+  setStatus('COMANDO CANCELADO — AGUARDANDO_');
+}
+
+function openNodeModal(node) {
+  document.getElementById('modal-title').textContent = node.label;
+  document.getElementById('node-modal-body').innerHTML = node.content || 'DADOS NÃO DISPONÍVEIS';
+  document.getElementById('node-modal').classList.add('active');
+  setStatus('NODE ' + node.id.toUpperCase() + ' ACESSADO');
+}
+
+function closeModal() {
+  document.getElementById('node-modal').classList.remove('active');
+  setStatus('AGUARDANDO COMANDO_');
+}
+
+// =========================================================
+// SPIKE
+// =========================================================
+document.getElementById('spike').style.left = '100px';
+document.getElementById('spike').style.top  = '300px';
+
+function moveSpikeToNewTarget() {
+  const spike = document.getElementById('spike');
+  spike.style.left = (80 + Math.random() * (window.innerWidth  - 160)) + 'px';
+  spike.style.top  = (80 + Math.random() * (window.innerHeight - 160)) + 'px';
+  const eyes = document.getElementById('spike-eyes');
+  if (Math.random() > 0.6) { eyes.textContent='◉ ◉'; eyes.style.color='#ff0000'; }
+  else                      { eyes.textContent='• •'; eyes.style.color='#660000'; }
+  setTimeout(moveSpikeToNewTarget, 3000 + Math.random() * 5000);
+}
+setTimeout(moveSpikeToNewTarget, 4000);
+
+document.getElementById('spike').style.pointerEvents = 'auto';
+document.getElementById('spike').style.cursor = 'pointer';
+document.getElementById('spike').addEventListener('click', () => {
+  initAudio();
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate*0.3, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<buf.length;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/buf.length*8);
+  const src = audioCtx.createBufferSource();
+  const filt = audioCtx.createBiquadFilter();
+  filt.type='bandpass'; filt.frequency.value=3000; filt.Q.value=2;
+  const gain = audioCtx.createGain(); gain.gain.value=0.4;
+  src.buffer=buf; src.connect(filt); filt.connect(gain); gain.connect(audioCtx.destination);
+  src.start();
+  document.getElementById('spike-eyes').textContent='😾';
+  document.getElementById('spike-eyes').style.fontSize='1.2rem';
+  setTimeout(()=>{ document.getElementById('spike-eyes').textContent='◉ ◉'; document.getElementById('spike-eyes').style.fontSize='0.5rem'; }, 1000);
+  setStatus('SPIKE: *HSSS* — NÃO TOQUE NO GATO');
+  moveSpikeToNewTarget();
+});
+
+// =========================================================
+// OFFICE ASSISTANT
+// =========================================================
+let assistantShown = false;
+const assistantMessages = [
+  'posso te ajudar? 👁','você encontrou algo?',
+  'cuidado com o Spike...','alguns setores nunca abrem.',
+  'a 6lenda está observando.','você foi escaneado. 📡',
+  'nem tudo deve ser visto.',
+];
+let asmIdx = 0;
+
+function showAssistant() {
+  if (assistantShown) return;
+  assistantShown = true;
+  document.getElementById('assistant').classList.add('visible');
+  setStatus('ASSISTENTE ATIVO — SERPENTTE_BOT');
+}
+function dismissAssistant() {
+  document.getElementById('assistant').classList.remove('active');
+  document.getElementById('assistant').classList.remove('visible');
+  assistantShown = false;
+  setTimeout(() => {
+    asmIdx = (asmIdx+1) % assistantMessages.length;
+    document.getElementById('assistant-text').textContent = assistantMessages[asmIdx];
+    showAssistant();
+  }, 15000 + Math.random()*20000);
+}
+function assistantClick() {
+  initAudio(); playHorn();
+  asmIdx = (asmIdx+1) % assistantMessages.length;
+  document.getElementById('assistant-text').textContent = assistantMessages[asmIdx];
+  setStatus('ASSISTENTE: "' + assistantMessages[asmIdx] + '"');
+}
+setTimeout(showAssistant, 8000);
+
+// =========================================================
+// DRAG MAP
+// =========================================================
+let isDragging=false, startX, startY, mapX=0, mapY=0;
+const container = document.getElementById('map-container');
+container.addEventListener('mousedown', e=>{isDragging=true;startX=e.clientX-mapX;startY=e.clientY-mapY;});
+container.addEventListener('mousemove', e=>{
+  if(!isDragging) return;
+  mapX=e.clientX-startX; mapY=e.clientY-startY;
+  document.getElementById('map').style.transform=`translate(calc(-50% + ${mapX}px), calc(-50% + ${mapY}px))`;
+});
+container.addEventListener('mouseup',()=>isDragging=false);
+container.addEventListener('mouseleave',()=>isDragging=false);
+let touchStart=null;
+container.addEventListener('touchstart', e=>{touchStart={x:e.touches[0].clientX-mapX,y:e.touches[0].clientY-mapY};});
+container.addEventListener('touchmove', e=>{
+  if(!touchStart) return; e.preventDefault();
+  mapX=e.touches[0].clientX-touchStart.x; mapY=e.touches[0].clientY-touchStart.y;
+  document.getElementById('map').style.transform=`translate(calc(-50% + ${mapX}px), calc(-50% + ${mapY}px))`;
+},{passive:false});
+
+// =========================================================
+// STATUS & CLOCK
+// =========================================================
+function setStatus(msg) { document.getElementById('status-msg').textContent = msg; }
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')+':'+n.getSeconds().toString().padStart(2,'0');
+}
+setInterval(updateClock, 1000); updateClock();
+const statusLoop = ['AGUARDANDO COMANDO_','SCANNING PERIMETER...','SERPENTTE_OS — ATIVO','SPIKE DETECTADO NA TELA','BUFFER_0/SLOT_6/NORMAL','VIRUS_SIGNATURE: STABLE','MONITORANDO ATIVIDADE...'];
+setInterval(()=>{ if(!beatPlaying) setStatus(statusLoop[Math.floor(Math.random()*statusLoop.length)]); }, 5000);
+
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeInvasion(); closeModal(); closeFall(); }
+});
+
+// =========================================================
+// INIT
+// =========================================================
+renderNodes();
+setStatus('MAPA CARREGADO — 5 FASES DETECTADAS_');
+showRegisterModal();
+</script>
+</body>
+</html>
